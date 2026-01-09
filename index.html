@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Stop Routing Guide</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚚 Multi-Stop Routing Guide</h1>
+            <p class="subtitle">Create and optimize your delivery routes with multiple stops</p>
+        </header>
+
+        <div class="main-content">
+            <div class="input-panel">
+                <div class="section">
+                    <h2>Add Stop</h2>
+                    <div class="input-group">
+                        <label for="stop-name">Stop Name/Address:</label>
+                        <input type="text" id="stop-name" placeholder="e.g., Warehouse, 123 Main St, City, State">
+                    </div>
+                    <div class="input-group">
+                        <label for="stop-notes">Notes (optional):</label>
+                        <input type="text" id="stop-notes" placeholder="Delivery instructions, contact info, etc.">
+                    </div>
+                    <button id="add-stop-btn" class="btn btn-primary">Add Stop</button>
+                </div>
+
+                <div class="section">
+                    <h2>Route Actions</h2>
+                    <div class="button-group">
+                        <button id="optimize-btn" class="btn btn-secondary">Auto-Optimize Route</button>
+                        <button id="clear-btn" class="btn btn-danger">Clear All Stops</button>
+                        <button id="export-btn" class="btn btn-success">Export Route</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stops-panel">
+                <div class="section">
+                    <h2>Route Stops (<span id="stop-count">0</span>)</h2>
+                    <div id="stops-list" class="stops-list">
+                        <div class="empty-state">
+                            <p>No stops added yet. Add your first stop to begin!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-section">
+            <h2>Route Map</h2>
+            <div id="map" class="map-container"></div>
+        </div>
+
+        <div class="route-summary">
+            <h2>Route Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="summary-label">Total Distance:</span>
+                    <span id="total-distance" class="summary-value">0 miles</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Estimated Time:</span>
+                    <span id="estimated-time" class="summary-value">0 min</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Number of Stops:</span>
+                    <span id="summary-stops" class="summary-value">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
