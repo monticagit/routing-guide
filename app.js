@@ -103,19 +103,12 @@ class RoutingGuide {
     addStop() {
         const nameInput = document.getElementById('stop-name');
         const notesInput = document.getElementById('stop-notes');
-        const validationMessage = document.getElementById('address-validation-message');
         
         const name = nameInput.value.trim();
         if (!name) {
-            this.showValidationMessage('Please enter a stop name or address', 'error');
-            nameInput.classList.add('error');
+            alert('Please enter a stop name or address');
             return;
         }
-
-        // Clear previous validation state
-        nameInput.classList.remove('error', 'valid');
-        this.showValidationMessage('Validating address...', 'validating');
-        nameInput.disabled = true;
 
         const stop = {
             id: Date.now(),
@@ -126,15 +119,21 @@ class RoutingGuide {
             validationStatus: 'validating' // validating, valid, invalid
         };
 
+        // Add stop immediately
         this.stops.push(stop);
         this.renderStops();
         this.saveToStorage();
 
-        // Validate address
-        this.validateAddress(stop, nameInput, notesInput);
+        // Clear inputs
+        nameInput.value = '';
+        notesInput.value = '';
+        nameInput.focus();
+
+        // Validate address in background
+        this.validateAddress(stop);
     }
 
-    async validateAddress(stop, nameInput, notesInput) {
+    async validateAddress(stop) {
         try {
             // Using Nominatim geocoding (free, no API key required)
             const response = await fetch(
@@ -156,43 +155,18 @@ class RoutingGuide {
                 stop.isValidated = true;
                 stop.validationStatus = 'valid';
                 stop.formattedAddress = data[0].display_name || stop.name;
-                
-                nameInput.classList.remove('error');
-                nameInput.classList.add('valid');
-                this.showValidationMessage('✓ Address validated successfully', 'success');
-                
                 this.updateMap();
             } else {
                 // Address not found
                 stop.isValidated = true;
                 stop.validationStatus = 'invalid';
-                
-                nameInput.classList.remove('valid');
-                nameInput.classList.add('error');
-                this.showValidationMessage('⚠ Address not found. Stop added but may not appear on map.', 'error');
             }
         } catch (error) {
             console.error('Geocoding error:', error);
             // Network error or API issue
             stop.isValidated = true;
             stop.validationStatus = 'invalid';
-            stop.validationError = 'Validation service unavailable';
-            
-            nameInput.classList.remove('valid');
-            nameInput.classList.add('error');
-            this.showValidationMessage('⚠ Could not validate address. Stop added but may not appear on map.', 'error');
         } finally {
-            // Re-enable input and clear after a delay
-            nameInput.disabled = false;
-            nameInput.value = '';
-            notesInput.value = '';
-            nameInput.focus();
-            
-            setTimeout(() => {
-                nameInput.classList.remove('error', 'valid');
-                this.showValidationMessage('', '');
-            }, 3000);
-            
             this.renderStops();
             this.saveToStorage();
         }
