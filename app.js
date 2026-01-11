@@ -103,33 +103,106 @@ class RoutingGuide {
     addStop() {
         const nameInput = document.getElementById('stop-name');
         const notesInput = document.getElementById('stop-notes');
+        const validationMessage = document.getElementById('address-validation-message');
         
         const name = nameInput.value.trim();
         if (!name) {
-            alert('Please enter a stop name or address');
+            this.showValidationMessage('Please enter a stop name or address', 'error');
+            nameInput.classList.add('error');
             return;
         }
+
+        // Clear previous validation state
+        nameInput.classList.remove('error', 'valid');
+        this.showValidationMessage('Validating address...', 'validating');
+        nameInput.disabled = true;
 
         const stop = {
             id: Date.now(),
             name: name,
             notes: notesInput.value.trim() || '',
-            position: null // Will be geocoded
+            position: null, // Will be geocoded
+            isValidated: false,
+            validationStatus: 'validating' // validating, valid, invalid
         };
 
         this.stops.push(stop);
-        nameInput.value = '';
-        notesInput.value = '';
-        nameInput.focus();
-
-        this.geocodeStop(stop);
         this.renderStops();
         this.saveToStorage();
+
+        // Validate address
+        this.validateAddress(stop, nameInput, notesInput);
+    }
+
+    async validateAddress(stop, nameInput, notesInput) {
+        try {
+            // Using Nominatim geocoding (free, no API key required)
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(stop.name)}&limit=1`,
+                {
+                    headers: {
+                        'User-Agent': 'RoutingGuideApp/1.0'
+                    }
+                }
+            );
+            
+            const data = await response.json();
+            if (data && data.length > 0) {
+                // Address is valid - geocoding successful
+                stop.position = {
+                    lat: parseFloat(data[0].lat),
+                    lng: parseFloat(data[0].lon)
+                };
+                stop.isValidated = true;
+                stop.validationStatus = 'valid';
+                stop.formattedAddress = data[0].display_name || stop.name;
+                
+                nameInput.classList.remove('error');
+                nameInput.classList.add('valid');
+                this.showValidationMessage('✓ Address validated successfully', 'success');
+                
+                this.updateMap();
+            } else {
+                // Address not found
+                stop.isValidated = true;
+                stop.validationStatus = 'invalid';
+                
+                nameInput.classList.remove('valid');
+                nameInput.classList.add('error');
+                this.showValidationMessage('⚠ Address not found. Stop added but may not appear on map.', 'error');
+            }
+        } catch (error) {
+            console.error('Geocoding error:', error);
+            // Network error or API issue
+            stop.isValidated = true;
+            stop.validationStatus = 'invalid';
+            stop.validationError = 'Validation service unavailable';
+            
+            nameInput.classList.remove('valid');
+            nameInput.classList.add('error');
+            this.showValidationMessage('⚠ Could not validate address. Stop added but may not appear on map.', 'error');
+        } finally {
+            // Re-enable input and clear after a delay
+            nameInput.disabled = false;
+            nameInput.value = '';
+            notesInput.value = '';
+            nameInput.focus();
+            
+            setTimeout(() => {
+                nameInput.classList.remove('error', 'valid');
+                this.showValidationMessage('', '');
+            }, 3000);
+            
+            this.renderStops();
+            this.saveToStorage();
+        }
     }
 
     async geocodeStop(stop) {
+        // This is for re-geocoding stops that don't have positions (e.g., on load)
+        if (stop.isValidated) return; // Skip if already validated
+        
         try {
-            // Using Nominatim geocoding (free, no API key required)
             const response = await fetch(
                 `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(stop.name)}&limit=1`,
                 {
@@ -145,11 +218,27 @@ class RoutingGuide {
                     lat: parseFloat(data[0].lat),
                     lng: parseFloat(data[0].lon)
                 };
+                stop.isValidated = true;
+                stop.validationStatus = 'valid';
+                stop.formattedAddress = data[0].display_name || stop.name;
                 this.updateMap();
+            } else {
+                stop.isValidated = true;
+                stop.validationStatus = 'invalid';
             }
         } catch (error) {
             console.error('Geocoding error:', error);
-            // Continue without position - user can still manually arrange stops
+            stop.isValidated = true;
+            stop.validationStatus = 'invalid';
+        }
+    }
+
+    showValidationMessage(message, type) {
+        const validationMessage = document.getElementById('address-validation-message');
+        validationMessage.textContent = message;
+        validationMessage.className = 'validation-message';
+        if (type) {
+            validationMessage.classList.add(type);
         }
     }
 
@@ -206,11 +295,27 @@ class RoutingGuide {
             return;
         }
 
-        stopsList.innerHTML = this.stops.map((stop, index) => `
-            <div class="stop-item" draggable="true" data-index="${stop.id}">
+        stopsList.innerHTML = this.stops.map((stop, index) => {
+            const validationIcon = stop.validationStatus === 'valid' ? '✓' : 
+                                  stop.validationStatus === 'invalid' ? '⚠' : 
+                                  stop.validationStatus === 'validating' ? '⟳' : '';
+            const validationClass = stop.validationStatus === 'valid' ? 'valid' : 
+                                   stop.validationStatus === 'invalid' ? 'invalid' : 
+                                   stop.validationStatus === 'validating' ? 'validating' : '';
+            const validationText = stop.validationStatus === 'valid' ? 'Valid address' : 
+                                  stop.validationStatus === 'invalid' ? 'Invalid address' : 
+                                  stop.validationStatus === 'validating' ? 'Validating...' : '';
+            const itemClass = stop.validationStatus === 'invalid' ? 'stop-item invalid-address' : 'stop-item';
+            
+            return `
+            <div class="${itemClass}" draggable="true" data-index="${stop.id}">
                 <div class="stop-number">${index + 1}</div>
                 <div class="stop-content">
-                    <div class="stop-name">${this.escapeHtml(stop.name)}</div>
+                    <div class="stop-name">
+                        ${this.escapeHtml(stop.name)}
+                        ${validationIcon ? `<span class="validation-status ${validationClass}" title="${validationText}">${validationIcon}</span>` : ''}
+                    </div>
+                    ${stop.formattedAddress && stop.formattedAddress !== stop.name ? `<div class="stop-notes" style="color: var(--success-color);">📍 ${this.escapeHtml(stop.formattedAddress)}</div>` : ''}
                     ${stop.notes ? `<div class="stop-notes">${this.escapeHtml(stop.notes)}</div>` : ''}
                 </div>
                 <div class="stop-controls">
@@ -219,7 +324,8 @@ class RoutingGuide {
                     <button class="control-btn danger" onclick="routingGuide.removeStop(${stop.id})" title="Remove">✕</button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         this.updateSummary();
     }
@@ -448,7 +554,7 @@ class RoutingGuide {
                 
                 // Re-geocode stops that don't have positions
                 this.stops.forEach(stop => {
-                    if (!stop.position) {
+                    if (!stop.position && !stop.isValidated) {
                         this.geocodeStop(stop);
                     }
                 });
